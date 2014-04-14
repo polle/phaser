@@ -23,7 +23,7 @@ Phaser.Frame = function (index, x, y, width, height, name, uuid) {
     * @property {number} index - The index of this Frame within the FrameData set it is being added to.
     */
     this.index = index;
-    
+
     /**
     * @property {number} x - X position within the image to cut from.
     */
@@ -154,6 +154,28 @@ Phaser.Frame.prototype = {
             this.spriteSourceSizeW = destWidth;
             this.spriteSourceSizeH = destHeight;
         }
+
+    },
+
+    /**
+    * Returns a Rectangle set to the dimensions of this Frame.
+    *
+    * @method Phaser.Frame#getRect
+    * @param {Phaser.Rectangle} [out] - A rectangle to copy the frame dimensions to.
+    * @return {Phaser.Rectangle} A rectangle.
+    */
+    getRect: function (out) {
+
+        if (typeof out === 'undefined')
+        {
+            out = new Phaser.Rectangle(this.x, this.y, this.width, this.height);
+        }
+        else
+        {
+            out.setTo(this.x, this.y, this.width, this.height);
+        }
+
+        return out;
 
     }
 

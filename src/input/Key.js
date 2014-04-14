@@ -14,9 +14,21 @@
 Phaser.Key = function (game, keycode) {
 
     /**
-    * @property {Phaser.Game} game - A reference to the currently running game. 
+    * @property {Phaser.Game} game - A reference to the currently running game.
     */
     this.game = game;
+
+    /**
+    * @property {boolean} enabled - An enabled key processes its update and dispatches events. You can toggle this at run-time to disable a key without deleting it.
+    * @default
+    */
+    this.enabled = true;
+
+    /**
+    * @property {object} event - Stores the most recent DOM event.
+    * @readonly
+    */
+    this.event = null;
 
     /**
     * @property {boolean} isDown - The "down" state of the key.
@@ -28,7 +40,7 @@ Phaser.Key = function (game, keycode) {
     * @property {boolean} isUp - The "up" state of the key.
     * @default
     */
-    this.isUp = false;
+    this.isUp = true;
 
     /**
     * @property {boolean} altKey - The down state of the ALT key, if pressed at the same time as this key.
@@ -49,8 +61,7 @@ Phaser.Key = function (game, keycode) {
     this.shiftKey = false;
 
     /**
-    * @property {number} timeDown - The timestamp when the key was last pressed down.
-    * @default
+    * @property {number} timeDown - The timestamp when the key was last pressed down. This is based on Game.time.now.
     */
     this.timeDown = 0;
 
@@ -63,10 +74,10 @@ Phaser.Key = function (game, keycode) {
     this.duration = 0;
 
     /**
-    * @property {number} timeUp - The timestamp when the key was last released.
+    * @property {number} timeUp - The timestamp when the key was last released. This is based on Game.time.now.
     * @default
     */
-    this.timeUp = 0;
+    this.timeUp = -2500;
 
     /**
     * @property {number} repeats - If a key is held down this holds down the number of times the key has 'repeated'.
@@ -85,13 +96,40 @@ Phaser.Key = function (game, keycode) {
     this.onDown = new Phaser.Signal();
 
     /**
+    * @property {function} onHoldCallback - A callback that is called while this Key is held down. Warning: Depending on refresh rate that could be 60+ times per second.
+    */
+    this.onHoldCallback = null;
+
+    /**
+    * @property {object} onHoldContext - The context under which the onHoldCallback will be called.
+    */
+    this.onHoldContext = null;
+
+    /**
     * @property {Phaser.Signal} onUp - This Signal is dispatched every time this Key is pressed down. It is only dispatched once (until the key is released again).
     */
     this.onUp = new Phaser.Signal();
-    
+
 };
 
 Phaser.Key.prototype = {
+
+    update: function () {
+
+        if (!this.enabled) { return; }
+
+        if (this.isDown)
+        {
+            this.duration = this.game.time.now - this.timeDown;
+            this.repeats++;
+
+            if (this.onHoldCallback)
+            {
+                this.onHoldCallback.call(this.onHoldContext, this);
+            }
+        }
+
+    },
 
     /**
     * Called automatically by Phaser.Keyboard.
@@ -101,26 +139,26 @@ Phaser.Key.prototype = {
     */
     processKeyDown: function (event) {
 
+        if (!this.enabled) { return; }
+
+        this.event = event;
+
+        if (this.isDown)
+        {
+            return;
+        }
+
         this.altKey = event.altKey;
         this.ctrlKey = event.ctrlKey;
         this.shiftKey = event.shiftKey;
 
-        if (this.isDown)
-        {
-            //  Key was already held down, this must be a repeat rate based event
-            this.duration = event.timeStamp - this.timeDown;
-            this.repeats++;
-        }
-        else
-        {
-            this.isDown = true;
-            this.isUp = false;
-            this.timeDown = event.timeStamp;
-            this.duration = 0;
-            this.repeats = 0;
+        this.isDown = true;
+        this.isUp = false;
+        this.timeDown = this.game.time.now;
+        this.duration = 0;
+        this.repeats = 0;
 
-            this.onDown.dispatch(this);
-        }
+        this.onDown.dispatch(this);
 
     },
 
@@ -132,11 +170,42 @@ Phaser.Key.prototype = {
     */
     processKeyUp: function (event) {
 
+        if (!this.enabled) { return; }
+
+        this.event = event;
+
+        if (this.isUp)
+        {
+            return;
+        }
+
         this.isDown = false;
         this.isUp = true;
-        this.timeUp = event.timeStamp;
+        this.timeUp = this.game.time.now;
+        this.duration = this.game.time.now - this.timeDown;
 
         this.onUp.dispatch(this);
+
+    },
+
+    /**
+    * Resets the state of this Key. This sets isDown to false, isUp to true, resets the time to be the current time and clears any callbacks
+    * associated with the onDown and onUp events and nulls the onHoldCallback if set.
+    *
+    * @method Phaser.Key#reset
+    */
+    reset: function () {
+
+        this.isDown = false;
+        this.isUp = true;
+        this.timeUp = this.game.time.now;
+        this.duration = this.game.time.now - this.timeDown;
+        this.enabled = true;
+
+        this.onDown.removeAll();
+        this.onUp.removeAll();
+        this.onHoldCallback = null;
+        this.onHoldContext = null;
 
     },
 
@@ -148,7 +217,7 @@ Phaser.Key.prototype = {
     */
     justPressed: function (duration) {
 
-        if (typeof duration === "undefined") { duration = 250; }
+        if (typeof duration === "undefined") { duration = 2500; }
 
         return (this.isDown && this.duration < duration);
 
@@ -162,9 +231,9 @@ Phaser.Key.prototype = {
     */
     justReleased: function (duration) {
 
-        if (typeof duration === "undefined") { duration = 250; }
+        if (typeof duration === "undefined") { duration = 2500; }
 
-        return (this.isDown === false && (this.game.time.now - this.timeUp < duration));
+        return (!this.isDown && ((this.game.time.now - this.timeUp) < duration));
 
     }
 

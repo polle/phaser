@@ -8,17 +8,17 @@
 
 /**
 * Phaser.RandomDataGenerator constructor.
-* 
+*
 * @class Phaser.RandomDataGenerator
 * @classdesc An extremely useful repeatable random data generator. Access it via Phaser.Game.rnd
 * Based on Nonsense by Josh Faul https://github.com/jocafa/Nonsense.
 * Random number generator from http://baagoe.org/en/wiki/Better_random_numbers_for_javascript
-* 
+*
 * @constructor
 * @param {array} seeds
 */
 Phaser.RandomDataGenerator = function (seeds) {
-    
+
     if (typeof seeds === "undefined") { seeds = []; }
 
     /**
@@ -71,7 +71,7 @@ Phaser.RandomDataGenerator.prototype = {
 
     /**
     * Reset the seed of the random data generator.
-    * 
+    *
     * @method Phaser.RandomDataGenerator#sow
     * @param {array} seeds
     */
@@ -95,7 +95,7 @@ Phaser.RandomDataGenerator.prototype = {
             this.s2 -= this.hash(seed);
             this.s2 += ~~(this.s2 < 0);
         }
-        
+
     },
 
     /**
@@ -154,14 +154,15 @@ Phaser.RandomDataGenerator.prototype = {
     },
 
     /**
-    * Returns a random integer between min and max.
+    * Returns a random integer between and including min and max.
+    *
     * @method Phaser.RandomDataGenerator#integerInRange
     * @param {number} min - The minimum value in the range.
     * @param {number} max - The maximum value in the range.
     * @return {number} A random number between min and max.
     */
     integerInRange: function (min, max) {
-        return Math.floor(this.realInRange(min, max));
+        return Math.round(this.realInRange(min, max));
     },
 
     /**
@@ -211,7 +212,7 @@ Phaser.RandomDataGenerator.prototype = {
     * @return {any} A random member of the array.
     */
     pick: function (ary) {
-        return ary[this.integerInRange(0, ary.length)];
+        return ary[this.integerInRange(0, ary.length - 1)];
     },
 
     /**
@@ -221,7 +222,7 @@ Phaser.RandomDataGenerator.prototype = {
     * @return {any} A random member of the array.
     */
     weightedPick: function (ary) {
-        return ary[~~(Math.pow(this.frac(), 2) * ary.length)];
+        return ary[~~(Math.pow(this.frac(), 2) * (ary.length - 1))];
     },
 
     /**

@@ -11,7 +11,7 @@
 *
 * For example to tell when a Sprite has been added to a new group:
 *
-* ```sprite.events.onAddedToGroup.add(yourFunction, this);```
+* `sprite.events.onAddedToGroup.add(yourFunction, this);`
 *
 * Where `yourFunction` is the function you want called when this event occurs.
 *
@@ -22,7 +22,7 @@
 * @param {Phaser.Sprite} sprite - A reference to Description.
 */
 Phaser.Events = function (sprite) {
-    
+
     this.parent = sprite;
 
     this.onAddedToGroup = new Phaser.Signal();
@@ -30,6 +30,7 @@ Phaser.Events = function (sprite) {
     this.onKilled = new Phaser.Signal();
     this.onRevived = new Phaser.Signal();
     this.onOutOfBounds = new Phaser.Signal();
+    this.onEnterBounds = new Phaser.Signal();
 
     this.onInputOver = null;
     this.onInputOut = null;
@@ -41,9 +42,6 @@ Phaser.Events = function (sprite) {
     this.onAnimationStart = null;
     this.onAnimationComplete = null;
     this.onAnimationLoop = null;
-
-    this.onBeginContact = null;
-    this.onEndContact = null;
 
 };
 

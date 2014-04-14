@@ -7,12 +7,15 @@
 /**
 * Abstracts away the use of RAF or setTimeOut for the core game update loop.
 *
-* @class Phaser.RequestAnimationFrame 
+* @class Phaser.RequestAnimationFrame
 * @constructor
 * @param {Phaser.Game} game - A reference to the currently running game.
+* @param {boolean} [forceSetTimeOut=false] - Tell Phaser to use setTimeOut even if raf is available.
 */
-Phaser.RequestAnimationFrame = function(game) {
-    
+Phaser.RequestAnimationFrame = function(game, forceSetTimeOut) {
+
+    if (typeof forceSetTimeOut === 'undefined') { forceSetTimeOut = false; }
+
     /**
     * @property {Phaser.Game} game - The currently running game.
     */
@@ -23,6 +26,11 @@ Phaser.RequestAnimationFrame = function(game) {
     * @default
     */
     this.isRunning = false;
+
+    /**
+    * @property {boolean} forceSetTimeOut - Tell Phaser to use setTimeOut even if raf is available.
+    */
+    this.forceSetTimeOut = forceSetTimeOut;
 
     var vendors = [
         'ms',
@@ -69,7 +77,7 @@ Phaser.RequestAnimationFrame.prototype = {
 
         var _this = this;
 
-        if (!window.requestAnimationFrame)
+        if (!window.requestAnimationFrame || this.forceSetTimeOut)
         {
             this._isSetTimeOut = true;
 
@@ -94,12 +102,11 @@ Phaser.RequestAnimationFrame.prototype = {
 
     /**
     * The update method for the requestAnimationFrame
-    * @method Phaser.RequestAnimationFrame#updateRAF    
-    * @param {number} time - A timestamp, either from RAF or setTimeOut
+    * @method Phaser.RequestAnimationFrame#updateRAF
     */
-    updateRAF: function (time) {
+    updateRAF: function () {
 
-        this.game.update(time);
+        this.game.update(Date.now());
 
         this._timeOutID = window.requestAnimationFrame(this._onLoop);
 

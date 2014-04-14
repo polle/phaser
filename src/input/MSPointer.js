@@ -20,7 +20,7 @@ Phaser.MSPointer = function (game) {
     * @property {Phaser.Game} game - A reference to the currently running game.
     */
     this.game = game;
-    
+
     /**
     * @property {Object} callbackContext - The context under which callbacks are called (defaults to game).
     */
@@ -37,13 +37,13 @@ Phaser.MSPointer = function (game) {
     * @private
     */
     this._onMSPointerDown = null;
-    
+
     /**
     * @property {function} _onMSPointerMove - Internal function to handle MSPointer events.
     * @private
     */
     this._onMSPointerMove = null;
-    
+
     /**
     * @property {function} _onMSPointerUp - Internal function to handle MSPointer events.
     * @private
@@ -59,6 +59,12 @@ Phaser.MSPointer.prototype = {
     * @method Phaser.MSPointer#start
     */
     start: function () {
+
+        if (this._onMSPointerDown !== null)
+        {
+            //  Avoid setting multiple listeners
+            return;
+        }
 
         var _this = this;
 
@@ -155,13 +161,13 @@ Phaser.MSPointer.prototype = {
     */
     stop: function () {
 
-        this.game.stage.canvas.removeEventListener('MSPointerDown', this._onMSPointerDown);
-        this.game.stage.canvas.removeEventListener('MSPointerMove', this._onMSPointerMove);
-        this.game.stage.canvas.removeEventListener('MSPointerUp', this._onMSPointerUp);
+        this.game.canvas.removeEventListener('MSPointerDown', this._onMSPointerDown);
+        this.game.canvas.removeEventListener('MSPointerMove', this._onMSPointerMove);
+        this.game.canvas.removeEventListener('MSPointerUp', this._onMSPointerUp);
 
-        this.game.stage.canvas.removeEventListener('pointerDown', this._onMSPointerDown);
-        this.game.stage.canvas.removeEventListener('pointerMove', this._onMSPointerMove);
-        this.game.stage.canvas.removeEventListener('pointerUp', this._onMSPointerUp);
+        this.game.canvas.removeEventListener('pointerDown', this._onMSPointerDown);
+        this.game.canvas.removeEventListener('pointerMove', this._onMSPointerMove);
+        this.game.canvas.removeEventListener('pointerUp', this._onMSPointerUp);
 
     }
 

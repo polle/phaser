@@ -44,39 +44,50 @@ Phaser.Time = function (game) {
     this.pausedTime = 0;
 
     /**
-    * @property {number} fps - Frames per second.
+    * @property {boolean} advancedTiming - If true Phaser.Time will perform advanced profiling including the fps rate, fps min/max and msMin and msMax.
+    * @default
+    */
+    this.advancedTiming = false;
+
+    /**
+    * @property {number} fps - Frames per second. Only calculated if Time.advancedTiming is true.
     * @protected
     */
     this.fps = 0;
 
     /**
-    * @property {number} fpsMin - The lowest rate the fps has dropped to.
+    * @property {number} fpsMin - The lowest rate the fps has dropped to. Only calculated if Time.advancedTiming is true.
     */
     this.fpsMin = 1000;
 
     /**
-    * @property {number} fpsMax - The highest rate the fps has reached (usually no higher than 60fps).
+    * @property {number} fpsMax - The highest rate the fps has reached (usually no higher than 60fps). Only calculated if Time.advancedTiming is true.
     */
     this.fpsMax = 0;
 
     /**
-    * @property {number} msMin - The minimum amount of time the game has taken between two frames.
+    * @property {number} msMin - The minimum amount of time the game has taken between two frames. Only calculated if Time.advancedTiming is true.
     * @default
     */
     this.msMin = 1000;
 
     /**
-    * @property {number} msMax - The maximum amount of time the game has taken between two frames.
+    * @property {number} msMax - The maximum amount of time the game has taken between two frames. Only calculated if Time.advancedTiming is true.
     */
     this.msMax = 0;
 
     /**
-    * @property {number} physicsElapsed - The elapsed time calculated for the physics motion updates.
+    * @property {number} physicsElapsed - The elapsed time calculated for the physics motion updates. In a stable 60fps system this will be 0.016 every frame.
     */
     this.physicsElapsed = 0;
 
     /**
-    * @property {number} frames - The number of frames record in the last second.
+    * @property {number} deltaCap - If you need to cap the delta timer, set the value here. For 60fps the delta should be 0.016, so try variances just above this.
+    */
+    this.deltaCap = 0;
+
+    /**
+    * @property {number} frames - The number of frames record in the last second. Only calculated if Time.advancedTiming is true.
     */
     this.frames = 0;
 
@@ -142,25 +153,26 @@ Phaser.Time = function (game) {
     */
     this._i = 0;
 
-    //  Listen for game pause/resume events
-    this.game.onPause.add(this.gamePaused, this);
-    this.game.onResume.add(this.gameResumed, this);
-
 };
 
 Phaser.Time.prototype = {
 
     /**
+    * Called automatically by Phaser.Game after boot. Should not be called directly.
+    *
     * @method Phaser.Time#boot
+    * @protected
     */
     boot: function () {
 
+        this._started = Date.now();
         this.events.start();
 
     },
 
     /**
     * Creates a new stand-alone Phaser.Timer object.
+    *
     * @method Phaser.Time#create
     * @param {boolean} [autoDestroy=true] - A Timer that is set to automatically destroy itself will do so after all of its events have been dispatched (assuming no looping events).
     * @return {Phaser.Timer} The Timer object that was created.
@@ -178,7 +190,8 @@ Phaser.Time.prototype = {
     },
 
     /**
-    * Remove all Timer objects, regardless of their state.
+    * Remove all Timer objects, regardless of their state. Also clears all Timers from the Time.events timer.
+    *
     * @method Phaser.Time#removeAll
     */
     removeAll: function () {
@@ -190,11 +203,15 @@ Phaser.Time.prototype = {
 
         this._timers = [];
 
+        this.events.removeAll();
+
     },
 
     /**
-    * Updates the game clock and calculate the fps. This is called automatically by Phaser.Game.
+    * Updates the game clock and if enabled the advanced timing data. This is called automatically by Phaser.Game.
+    *
     * @method Phaser.Time#update
+    * @protected
     * @param {number} time - The current timestamp, either performance.now or Date.now depending on the browser.
     */
     update: function (time) {
@@ -205,49 +222,47 @@ Phaser.Time.prototype = {
         {
             this.time = this.now;
             this._justResumed = false;
-    
+
             this.events.resume();
 
             for (var i = 0; i < this._timers.length; i++)
             {
-                this._timers[i].resume();
+                this._timers[i]._resume();
             }
         }
 
         this.timeToCall = this.game.math.max(0, 16 - (time - this.lastTime));
 
         this.elapsed = this.now - this.time;
+        this.physicsElapsed = this.elapsed / 1000;
 
-        this.msMin = this.game.math.min(this.msMin, this.elapsed);
-        this.msMax = this.game.math.max(this.msMax, this.elapsed);
-
-        this.frames++;
-
-        if (this.now > this._timeLastSecond + 1000)
+        if (this.deltaCap > 0 && this.physicsElapsed > this.deltaCap)
         {
-            this.fps = Math.round((this.frames * 1000) / (this.now - this._timeLastSecond));
-            this.fpsMin = this.game.math.min(this.fpsMin, this.fps);
-            this.fpsMax = this.game.math.max(this.fpsMax, this.fps);
-            this._timeLastSecond = this.now;
-            this.frames = 0;
+            this.physicsElapsed = this.deltaCap;
+        }
+
+        if (this.advancedTiming)
+        {
+            this.msMin = this.game.math.min(this.msMin, this.elapsed);
+            this.msMax = this.game.math.max(this.msMax, this.elapsed);
+
+            this.frames++;
+
+            if (this.now > this._timeLastSecond + 1000)
+            {
+                this.fps = Math.round((this.frames * 1000) / (this.now - this._timeLastSecond));
+                this.fpsMin = this.game.math.min(this.fpsMin, this.fps);
+                this.fpsMax = this.game.math.max(this.fpsMax, this.fps);
+                this._timeLastSecond = this.now;
+                this.frames = 0;
+            }
         }
 
         this.time = this.now;
         this.lastTime = time + this.timeToCall;
-        this.physicsElapsed = 1.0 * (this.elapsed / 1000);
 
-        //  Clamp the delta
-        if (this.physicsElapsed > 0.05)
-        {
-            this.physicsElapsed = 0.05;
-        }
-
-        //  Paused?
-        if (this.game.paused)
-        {
-            this.pausedTime = this.now - this._pauseStarted;
-        }
-        else
+        //  Paused but still running?
+        if (!this.game.paused)
         {
             //  Our internal Phaser.Timer
             this.events.update(this.now);
@@ -275,40 +290,47 @@ Phaser.Time.prototype = {
 
     /**
     * Called when the game enters a paused state.
+    *
     * @method Phaser.Time#gamePaused
     * @private
     */
     gamePaused: function () {
-        
+
         this._pauseStarted = this.now;
 
         this.events.pause();
 
-        for (var i = 0; i < this._timers.length; i++)
+        var i = this._timers.length;
+
+        while (i--)
         {
-            this._timers[i].pause();
+            this._timers[i]._pause();
         }
 
     },
 
     /**
     * Called when the game resumes from a paused state.
+    *
     * @method Phaser.Time#gameResumed
     * @private
     */
     gameResumed: function () {
 
+        this.pauseDuration = Date.now() - this._pauseStarted;
+
         //  Level out the elapsed timer to avoid spikes
         this.time = Date.now();
-        this.pauseDuration = this.pausedTime;
+
         this._justResumed = true;
 
     },
 
     /**
     * The number of seconds that have elapsed since the game was started.
+    *
     * @method Phaser.Time#totalElapsedSeconds
-    * @return {number}
+    * @return {number} The number of seconds that have elapsed since the game was started.
     */
     totalElapsedSeconds: function() {
         return (this.now - this._started) * 0.001;
@@ -316,6 +338,7 @@ Phaser.Time.prototype = {
 
     /**
     * How long has passed since the given time.
+    *
     * @method Phaser.Time#elapsedSince
     * @param {number} since - The time you want to measure against.
     * @return {number} The difference between the given time and now.
@@ -326,6 +349,7 @@ Phaser.Time.prototype = {
 
     /**
     * How long has passed since the given time (in seconds).
+    *
     * @method Phaser.Time#elapsedSecondsSince
     * @param {number} since - The time you want to measure (in seconds).
     * @return {number} Duration between given time and now (in seconds).
@@ -335,11 +359,15 @@ Phaser.Time.prototype = {
     },
 
     /**
-    * Resets the private _started value to now.
+    * Resets the private _started value to now and removes all currently running Timers.
+    *
     * @method Phaser.Time#reset
     */
     reset: function () {
+
         this._started = this.now;
+        this.removeAll();
+
     }
 
 };

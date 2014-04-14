@@ -67,6 +67,12 @@ Phaser.Timer = function (game, autoDestroy) {
     this.paused = false;
 
     /**
+    * @property {boolean} _codePaused - Was the Timer paused by code or by Game focus loss?
+    * @private
+    */
+    this._codePaused = false;
+
+    /**
     * @property {number} _started - The time at which this Timer instance started running.
     * @private
     * @default
@@ -78,6 +84,12 @@ Phaser.Timer = function (game, autoDestroy) {
     * @private
     */
     this._pauseStarted = 0;
+
+    /**
+    * @property {number} _pauseTotal - Total paused time.
+    * @private
+    */
+    this._pauseTotal = 0;
 
     /**
     * @property {number} _now - The current start-time adjusted time.
@@ -96,6 +108,18 @@ Phaser.Timer = function (game, autoDestroy) {
     * @private
     */
     this._i = 0;
+
+    /**
+    * @property {number} _diff - Internal cache var.
+    * @private
+    */
+    this._diff = 0;
+
+    /**
+    * @property {number} _newTick - Internal cache var.
+    * @private
+    */
+    this._newTick = 0;
 
 };
 
@@ -141,7 +165,11 @@ Phaser.Timer.prototype = {
 
         var tick = delay;
 
-        if (this.running)
+        if (this._now === 0)
+        {
+            tick += this.game.time.now;
+        }
+        else
         {
             tick += this._now;
         }
@@ -162,6 +190,7 @@ Phaser.Timer.prototype = {
     * Adds a new Event to this Timer. The event will fire after the given amount of 'delay' in milliseconds has passed, once the Timer has started running.
     * Call Timer.start() once you have added all of the Events you require for this Timer. The delay is in relation to when the Timer starts, not the time it was added.
     * If the Timer is already running the delay will be calculated based on the timers current time.
+    *
     * @method Phaser.Timer#add
     * @param {number} delay - The number of milliseconds that should elapse before the Timer will call the given callback.
     * @param {function} callback - The callback that will be called when the Timer event occurs.
@@ -180,9 +209,10 @@ Phaser.Timer.prototype = {
     * The event will fire after the given amount of 'delay' milliseconds has passed once the Timer has started running.
     * Call Timer.start() once you have added all of the Events you require for this Timer. The delay is in relation to when the Timer starts, not the time it was added.
     * If the Timer is already running the delay will be calculated based on the timers current time.
+    *
     * @method Phaser.Timer#repeat
     * @param {number} delay - The number of milliseconds that should elapse before the Timer will call the given callback.
-    * @param {number} repeatCount - The number of times the event will repeat.
+    * @param {number} repeatCount - The number of times the event will repeat once is has finished playback. A repeatCount of 1 means it will repeat itself once, playing the event twice in total.
     * @param {function} callback - The callback that will be called when the Timer event occurs.
     * @param {object} callbackContext - The context in which the callback will be called.
     * @param {...*} arguments - The values to be sent to your callback function when it is called.
@@ -199,6 +229,7 @@ Phaser.Timer.prototype = {
     * The event will fire after the given amount of 'delay' milliseconds has passed once the Timer has started running.
     * Call Timer.start() once you have added all of the Events you require for this Timer. The delay is in relation to when the Timer starts, not the time it was added.
     * If the Timer is already running the delay will be calculated based on the timers current time.
+    *
     * @method Phaser.Timer#loop
     * @param {number} delay - The number of milliseconds that should elapse before the Timer will call the given callback.
     * @param {function} callback - The callback that will be called when the Timer event occurs.
@@ -215,22 +246,41 @@ Phaser.Timer.prototype = {
     /**
     * Starts this Timer running.
     * @method Phaser.Timer#start
+    * @param {number} [delay=0] - The number of milliseconds that should elapse before the Timer will start.
     */
-    start: function() {
+    start: function (delay) {
 
-        this._started = this.game.time.now;
+        if (this.running)
+        {
+            return;
+        }
+
+        this._started = this.game.time.now + (delay || 0);
+
         this.running = true;
+
+        for (var i = 0; i < this.events.length; i++)
+        {
+            this.events[i].tick = this.events[i].delay + this._started;
+        }
 
     },
 
     /**
     * Stops this Timer from running. Does not cause it to be destroyed if autoDestroy is set to true.
     * @method Phaser.Timer#stop
+    * @param {boolean} [clearEvents=true] - If true all the events in Timer will be cleared, otherwise they will remain.
     */
-    stop: function() {
+    stop: function (clearEvents) {
 
         this.running = false;
-        this.events.length = 0;
+
+        if (typeof clearEvents === 'undefined') { clearEvents = true; }
+
+        if (clearEvents)
+        {
+            this.events.length = 0;
+        }
 
     },
 
@@ -239,7 +289,7 @@ Phaser.Timer.prototype = {
     * @param {Phaser.TimerEvent} event - The event to remove from the queue.
     * @method Phaser.Timer#remove
     */
-    remove: function(event) {
+    remove: function (event) {
 
         for (var i = 0; i < this.events.length; i++)
         {
@@ -291,62 +341,75 @@ Phaser.Timer.prototype = {
     },
 
     /**
+    * Clears any events from the Timer which have pendingDelete set to true and then resets the private _len and _i values.
+    *
+    * @method Phaser.Timer#clearPendingEvents
+    */
+    clearPendingEvents: function () {
+
+        this._i = this.events.length;
+
+        while (this._i--)
+        {
+            if (this.events[this._i].pendingDelete)
+            {
+                this.events.splice(this._i, 1);
+            }
+        }
+
+        this._len = this.events.length;
+        this._i = 0;
+
+    },
+
+    /**
     * The main Timer update event, called automatically by the Game clock.
     * @method Phaser.Timer#update
     * @protected
     * @param {number} time - The time from the core game clock.
     * @return {boolean} True if there are still events waiting to be dispatched, otherwise false if this Timer can be destroyed.
     */
-    update: function(time) {
+    update: function (time) {
 
         if (this.paused)
         {
             return true;
         }
 
-        this._now = time - this._started;
+        this._now = time;
 
-        this._len = this.events.length;
-
-        this._i = 0;
-
-        while (this._i < this._len)
-        {
-            if (this.events[this._i].pendingDelete)
-            {
-                this.events.splice(this._i, 1);
-                this._len--;
-            }
-
-            this._i++;
-        }
-
-        this._len = this.events.length;
+        //  Clears events marked for deletion and resets _len and _i to 0.
+        this.clearPendingEvents();
 
         if (this.running && this._now >= this.nextTick && this._len > 0)
         {
-            this._i = 0;
-
-            while (this._i < this._len)
+            while (this._i < this._len && this.running)
             {
                 if (this._now >= this.events[this._i].tick)
                 {
+                    //  (now + delay) - (time difference from last tick to now)
+                    this._newTick = (this._now + this.events[this._i].delay) - (this._now - this.events[this._i].tick);
+
+                    if (this._newTick < 0)
+                    {
+                        this._newTick = this._now + this.events[this._i].delay;
+                    }
+
                     if (this.events[this._i].loop === true)
                     {
-                        this.events[this._i].tick += this.events[this._i].delay - (this._now - this.events[this._i].tick);
+                        this.events[this._i].tick = this._newTick;
                         this.events[this._i].callback.apply(this.events[this._i].callbackContext, this.events[this._i].args);
                     }
                     else if (this.events[this._i].repeatCount > 0)
                     {
                         this.events[this._i].repeatCount--;
-                        this.events[this._i].tick += this.events[this._i].delay - (this._now - this.events[this._i].tick);
+                        this.events[this._i].tick = this._newTick;
                         this.events[this._i].callback.apply(this.events[this._i].callbackContext, this.events[this._i].args);
                     }
                     else
                     {
                         this.events[this._i].callback.apply(this.events[this._i].callbackContext, this.events[this._i].args);
-                        this.events.splice(this._i, 1);
-                        this._len--;
+                        this.events[this._i].pendingDelete = true;
                     }
 
                     this._i++;
@@ -385,7 +448,24 @@ Phaser.Timer.prototype = {
     * @method Phaser.Timer#pause
     */
     pause: function () {
-        
+
+        if (this.running && !this.expired)
+        {
+            this._pauseStarted = this.game.time.now;
+
+            this.paused = true;
+            this._codePaused = true;
+        }
+
+    },
+
+    /**
+    * This is called by the core Game loop. Do not call it directly, instead use Timer.pause.
+    * @method Phaser.Timer#_pause
+    * @private
+    */
+    _pause: function () {
+
         if (this.running && !this.expired)
         {
             this._pauseStarted = this.game.time.now;
@@ -405,6 +485,8 @@ Phaser.Timer.prototype = {
         {
             var pauseDuration = this.game.time.now - this._pauseStarted;
 
+            this._pauseTotal += pauseDuration;
+
             for (var i = 0; i < this.events.length; i++)
             {
                 this.events[i].tick += pauseDuration;
@@ -413,20 +495,57 @@ Phaser.Timer.prototype = {
             this.nextTick += pauseDuration;
 
             this.paused = false;
+            this._codePaused = false;
         }
 
     },
 
     /**
-    * Destroys this Timer. Events are not dispatched.
+    * This is called by the core Game loop. Do not call it directly, instead use Timer.pause.
+    * @method Phaser.Timer#_resume
+    * @private
+    */
+    _resume: function () {
+
+        if (this._codePaused)
+        {
+            return;
+        }
+        else
+        {
+            this.resume();
+        }
+
+    },
+
+    /**
+    * Removes all Events from this Timer and all callbacks linked to onComplete, but leaves the Timer running.
+    * The onComplete callbacks won't be called.
+    *
+    * @method Phaser.Timer#removeAll
+    */
+    removeAll: function () {
+
+        this.onComplete.removeAll();
+        this.events.length = 0;
+        this._len = 0;
+        this._i = 0;
+
+    },
+
+    /**
+    * Destroys this Timer. Any pending Events are not dispatched.
+    * The onComplete callbacks won't be called.
+    *
     * @method Phaser.Timer#destroy
     */
-    destroy: function() {
+    destroy: function () {
 
         this.onComplete.removeAll();
         this.running = false;
         this.events = [];
-        this._i = this._len;
+        this._len = 0;
+        this._i = 0;
 
     }
 
@@ -453,7 +572,7 @@ Object.defineProperty(Phaser.Timer.prototype, "next", {
 Object.defineProperty(Phaser.Timer.prototype, "duration", {
 
     get: function () {
-        
+
         if (this.running && this.nextTick > this._now)
         {
             return this.nextTick - this._now;
@@ -488,7 +607,7 @@ Object.defineProperty(Phaser.Timer.prototype, "length", {
 Object.defineProperty(Phaser.Timer.prototype, "ms", {
 
     get: function () {
-        return this._now;
+        return this._now - this._started - this._pauseTotal;
     }
 
 });
@@ -501,7 +620,7 @@ Object.defineProperty(Phaser.Timer.prototype, "ms", {
 Object.defineProperty(Phaser.Timer.prototype, "seconds", {
 
     get: function () {
-        return this._now * 0.001;
+        return this.ms * 0.001;
     }
 
 });

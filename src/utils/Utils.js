@@ -11,7 +11,50 @@
 * @static
 */
 Phaser.Utils = {
-    
+
+    /**
+    * Get a unit dimension from a string.
+    *
+    * @method Phaser.Utils.parseDimension
+    * @param {string|number} size - The size to parse.
+    * @param {number} dimension - The window dimension to check.
+    * @return {number} The parsed dimension.
+    */
+    parseDimension: function (size, dimension) {
+
+        var f = 0;
+        var px = 0;
+
+        if (typeof size === 'string')
+        {
+            //  %?
+            if (size.substr(-1) === '%')
+            {
+                f = parseInt(size, 10) / 100;
+
+                if (dimension === 0)
+                {
+                    px = window.innerWidth * f;
+                }
+                else
+                {
+                    px = window.innerHeight * f;
+                }
+            }
+            else
+            {
+                px = parseInt(size, 10);
+            }
+        }
+        else
+        {
+            px = size;
+        }
+
+        return px;
+
+    },
+
     /**
     * A standard Fisher-Yates Array shuffle implementation.
     * @method Phaser.Utils.shuffle
@@ -29,7 +72,7 @@ Phaser.Utils = {
         }
 
         return array;
-        
+
     },
 
     /**
@@ -37,7 +80,7 @@ Phaser.Utils = {
     * pad = the string to pad it out with (defaults to a space)
     * dir = 1 (left), 2 (right), 3 (both)
     * @method Phaser.Utils.pad
-    * @param {string} str - The target string. 
+    * @param {string} str - The target string.
     * @param {number} len - The number of characters to be added.
     * @param {number} pad - The string to pad it out with (defaults to a space).
     * @param {number} [dir=3] The direction dir = 1 (left), 2 (right), 3 (both).
@@ -56,17 +99,17 @@ Phaser.Utils = {
             switch (dir)
             {
                 case 1:
-                    str = Array(len + 1 - str.length).join(pad) + str;
+                    str = new Array(len + 1 - str.length).join(pad) + str;
                     break;
 
                 case 3:
                     var right = Math.ceil((padlen = len - str.length) / 2);
                     var left = padlen - right;
-                    str = Array(left+1).join(pad) + str + Array(right+1).join(pad);
+                    str = new Array(left+1).join(pad) + str + new Array(right+1).join(pad);
                     break;
 
                 default:
-                    str = str + Array(len + 1 - str.length).join(pad);
+                    str = str + new Array(len + 1 - str.length).join(pad);
                     break;
             }
         }
@@ -97,7 +140,7 @@ Phaser.Utils = {
         // the "constructor" property of certain host objects, ie. |window.location|
         // https://bugzilla.mozilla.org/show_bug.cgi?id=814622
         try {
-            if (obj.constructor && !hasOwn.call(obj.constructor.prototype, "isPrototypeOf"))
+            if (obj.constructor && !({}).hasOwnProperty.call(obj.constructor.prototype, "isPrototypeOf"))
             {
                 return false;
             }
@@ -109,13 +152,6 @@ Phaser.Utils = {
         // |obj| is a plain object, created by {} or constructed with new Object
         return true;
     },
-
-
-    //  deep, target, objects to copy to the target object
-    //  This is a slightly modified version of {@link http://api.jquery.com/jQuery.extend/|jQuery.extend}
-    //  deep (boolean)
-    //  target (object to add to)
-    //  objects ... (objects to recurse and copy from)
 
     /**
     * This is a slightly modified version of http://api.jquery.com/jQuery.extend/
@@ -148,7 +184,7 @@ Phaser.Utils = {
             --i;
         }
 
-        for ( ; i < length; i++ )
+        for (; i < length; i++)
         {
             // Only deal with non-null/undefined values
             if ((options = arguments[i]) != null)
@@ -197,19 +233,12 @@ Phaser.Utils = {
 
 };
 
-function HEXtoRGB(hex) {
-    return [(hex >> 16 & 0xFF) / 255, ( hex >> 8 & 0xFF) / 255, (hex & 0xFF)/ 255];
-}
-
-PIXI.hex2rgb = function hex2rgb(hex) {
-    return [(hex >> 16 & 0xFF) / 255, ( hex >> 8 & 0xFF) / 255, (hex & 0xFF)/ 255];
-};
-
 /**
 * A polyfill for Function.prototype.bind
 */
 if (typeof Function.prototype.bind != 'function') {
 
+    /* jshint freeze: false */
     Function.prototype.bind = (function () {
 
         var slice = Array.prototype.slice;
@@ -217,26 +246,29 @@ if (typeof Function.prototype.bind != 'function') {
         return function (thisArg) {
 
             var target = this, boundArgs = slice.call(arguments, 1);
- 
+
             if (typeof target != 'function')
             {
                 throw new TypeError();
             }
- 
+
             function bound() {
                 var args = boundArgs.concat(slice.call(arguments));
                 target.apply(this instanceof bound ? this : thisArg, args);
             }
- 
+
             bound.prototype = (function F(proto) {
-                proto && (F.prototype = proto);
+                if (proto)
+                {
+                    F.prototype = proto;
+                }
 
                 if (!(this instanceof F))
                 {
                     return new F;
                 }
             })(target.prototype);
- 
+
             return bound;
         };
     })();
@@ -245,9 +277,45 @@ if (typeof Function.prototype.bind != 'function') {
 /**
 * A polyfill for Array.isArray
 */
-if (!Array.isArray) {
-  Array.isArray = function (arg) {
-    return Object.prototype.toString.call(arg) == '[object Array]';
-  };
+if (!Array.isArray)
+{
+    Array.isArray = function (arg)
+    {
+        return Object.prototype.toString.call(arg) == '[object Array]';
+    };
 }
 
+/**
+* A polyfill for Array.forEach
+* https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/forEach
+*/
+if (!Array.prototype.forEach)
+{
+    Array.prototype.forEach = function(fun /*, thisArg */)
+    {
+        "use strict";
+
+        if (this === void 0 || this === null)
+        {
+            throw new TypeError();
+        }
+
+        var t = Object(this);
+        var len = t.length >>> 0;
+
+        if (typeof fun !== "function")
+        {
+            throw new TypeError();
+        }
+
+        var thisArg = arguments.length >= 2 ? arguments[1] : void 0;
+
+        for (var i = 0; i < len; i++)
+        {
+            if (i in t)
+            {
+                fun.call(thisArg, t[i], i, t);
+            }
+        }
+    };
+}

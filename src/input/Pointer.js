@@ -169,11 +169,16 @@ Phaser.Pointer = function (game, id) {
     * @property {Phaser.Point} position - A Phaser.Point object containing the current x/y values of the pointer on the display.
     */
     this.position = new Phaser.Point();
-    
+
     /**
     * @property {Phaser.Point} positionDown - A Phaser.Point object containing the x/y values of the pointer when it was last in a down state on the display.
     */
     this.positionDown = new Phaser.Point();
+    
+    /**
+    * @property {Phaser.Point} positionUp - A Phaser.Point object containing the x/y values of the pointer when it was last released.
+    */
+    this.positionUp = new Phaser.Point();
 
     /**
     * A Phaser.Circle that is centered on the x/y coordinates of this pointer, useful for hit detection.
@@ -206,14 +211,7 @@ Phaser.Pointer.prototype = {
             this.button = event.button;
         }
 
-        //  Fix to stop rogue browser plugins from blocking the visibility state event
-        if (this.game.stage.disableVisibilityChange === false && this.game.paused && this.game.stage.scale.incorrectOrientation === false)
-        {
-            this.game.paused = false;
-            return this;
-        }
-
-        this._history.length = 0;
+        this._history = [];
         this.active = true;
         this.withinGame = true;
         this.isDown = true;
@@ -225,12 +223,12 @@ Phaser.Pointer.prototype = {
         this._holdSent = false;
 
         //  This sets the x/y and other local values
-        this.move(event);
+        this.move(event, true);
 
         // x and y are the old values here?
         this.positionDown.setTo(this.x, this.y);
 
-        if (this.game.input.multiInputOverride == Phaser.Input.MOUSE_OVERRIDES_TOUCH || this.game.input.multiInputOverride == Phaser.Input.MOUSE_TOUCH_COMBINE || (this.game.input.multiInputOverride == Phaser.Input.TOUCH_OVERRIDES_MOUSE && this.game.input.currentPointers === 0))
+        if (this.game.input.multiInputOverride === Phaser.Input.MOUSE_OVERRIDES_TOUCH || this.game.input.multiInputOverride === Phaser.Input.MOUSE_TOUCH_COMBINE || (this.game.input.multiInputOverride === Phaser.Input.TOUCH_OVERRIDES_MOUSE && this.game.input.currentPointers === 0))
         {
             this.game.input.x = this.x;
             this.game.input.y = this.y;
@@ -242,7 +240,7 @@ Phaser.Pointer.prototype = {
         this._stateReset = false;
         this.totalTouches++;
 
-        if (this.isMouse === false)
+        if (!this.isMouse)
         {
             this.game.input.currentPointers++;
         }
@@ -283,7 +281,7 @@ Phaser.Pointer.prototype = {
                     x: this.position.x,
                     y: this.position.y
                 });
-            
+
                 if (this._history.length > this.game.input.recordLimit)
                 {
                     this._history.shift();
@@ -297,13 +295,16 @@ Phaser.Pointer.prototype = {
     * Called when the Pointer is moved.
     * @method Phaser.Pointer#move
     * @param {MouseEvent|PointerEvent|TouchEvent} event - The event passed up from the input handler.
+    * @param {boolean} [fromClick=false] - Was this called from the click event?
     */
-    move: function (event) {
+    move: function (event, fromClick) {
 
         if (this.game.input.pollLocked)
         {
             return;
         }
+
+        if (typeof fromClick === 'undefined') { fromClick = false; }
 
         if (typeof event.button !== 'undefined')
         {
@@ -359,7 +360,7 @@ Phaser.Pointer.prototype = {
         }
 
         //  Work out which object is on the top
-        this._highestRenderOrderID = -1;
+        this._highestRenderOrderID = Number.MAX_SAFE_INTEGER;
         this._highestRenderObject = null;
         this._highestInputPriorityID = -1;
 
@@ -371,22 +372,21 @@ Phaser.Pointer.prototype = {
             do
             {
                 //  If the object is using pixelPerfect checks, or has a higher InputManager.PriorityID OR if the priority ID is the same as the current highest AND it has a higher renderOrderID, then set it to the top
-                if (currentNode.pixelPerfect || currentNode.priorityID > this._highestInputPriorityID || (currentNode.priorityID == this._highestInputPriorityID && currentNode.sprite.renderOrderID > this._highestRenderOrderID))
+                if (currentNode.validForInput(this._highestInputPriorityID, this._highestRenderOrderID))
                 {
-                    if (currentNode.checkPointerOver(this))
+                    if ((!fromClick && currentNode.checkPointerOver(this)) || (fromClick && currentNode.checkPointerDown(this)))
                     {
-                        // console.log('HRO set', currentNode.sprite.name);
-                        this._highestRenderOrderID = currentNode.sprite.renderOrderID;
+                        this._highestRenderOrderID = currentNode.sprite._cache[3]; // renderOrderID
                         this._highestInputPriorityID = currentNode.priorityID;
                         this._highestRenderObject = currentNode;
                     }
                 }
                 currentNode = currentNode.next;
             }
-            while (currentNode != null)
+            while (currentNode != null);
         }
 
-        if (this._highestRenderObject == null)
+        if (this._highestRenderObject === null)
         {
             //  The pointer isn't currently over anything, check if we've got a lingering previous target
             if (this.targetObject)
@@ -398,7 +398,7 @@ Phaser.Pointer.prototype = {
         }
         else
         {
-            if (this.targetObject == null)
+            if (this.targetObject === null)
             {
                 //  And now set the new one
                 // console.log('And now set the new one');
@@ -409,7 +409,7 @@ Phaser.Pointer.prototype = {
             {
                 //  We've got a target from the last update
                 // console.log("We've got a target from the last update");
-                if (this.targetObject == this._highestRenderObject)
+                if (this.targetObject === this._highestRenderObject)
                 {
                     //  Same target as before, so update it
                     // console.log("Same target as before, so update it");
@@ -443,7 +443,7 @@ Phaser.Pointer.prototype = {
     leave: function (event) {
 
         this.withinGame = false;
-        this.move(event);
+        this.move(event, false);
 
     },
 
@@ -494,7 +494,9 @@ Phaser.Pointer.prototype = {
         this.withinGame = false;
         this.isDown = false;
         this.isUp = true;
-
+        
+        this.positionUp.setTo(this.x, this.y);
+        
         if (this.isMouse === false)
         {
             this.game.input.currentPointers--;
@@ -503,17 +505,17 @@ Phaser.Pointer.prototype = {
         if (this.game.input.interactiveItems.total > 0)
         {
             var currentNode = this.game.input.interactiveItems.next;
-            
+
             do
             {
                 if (currentNode)
                 {
                     currentNode._releasedHandler(this);
                 }
-                
+
                 currentNode = currentNode.next;
             }
-            while (currentNode != null)
+            while (currentNode != null);
         }
 
         if (this.targetObject)

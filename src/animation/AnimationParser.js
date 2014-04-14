@@ -47,10 +47,10 @@ Phaser.AnimationParser = {
             frameHeight = Math.floor(-height / Math.min(-1, frameHeight));
         }
 
-        var row = Math.round(width / frameWidth);
-        var column = Math.round(height / frameHeight);
+        var row = Math.floor((width - margin) / (frameWidth + spacing));
+        var column = Math.floor((height - margin) / (frameHeight + spacing));
         var total = row * column;
-        
+
         if (frameMax !== -1)
         {
             total = frameMax;
@@ -83,7 +83,7 @@ Phaser.AnimationParser = {
 
             x += frameWidth + spacing;
 
-            if (x === width)
+            if (x + frameWidth > width)
             {
                 x = margin;
                 y += frameHeight + spacing;
@@ -115,11 +115,11 @@ Phaser.AnimationParser = {
 
         //  Let's create some frames then
         var data = new Phaser.FrameData();
-        
+
         //  By this stage frames is a fully parsed array
         var frames = json['frames'];
         var newFrame;
-        
+
         for (var i = 0; i < frames.length; i++)
         {
             var uuid = game.rnd.uuid();
@@ -153,12 +153,9 @@ Phaser.AnimationParser = {
                     frames[i].spriteSourceSize.h
                 );
 
-                //  We had to hack Pixi to get this to work :(
-                PIXI.TextureCache[uuid].trimmed = true;
-                PIXI.TextureCache[uuid].trim.x = frames[i].spriteSourceSize.x;
-                PIXI.TextureCache[uuid].trim.y = frames[i].spriteSourceSize.y;
-
+                PIXI.TextureCache[uuid].trim = new Phaser.Rectangle(frames[i].spriteSourceSize.x, frames[i].spriteSourceSize.y, frames[i].sourceSize.w, frames[i].sourceSize.h);
             }
+
         }
 
         return data;
@@ -183,7 +180,7 @@ Phaser.AnimationParser = {
             console.log(json);
             return;
         }
-            
+
         //  Let's create some frames then
         var data = new Phaser.FrameData();
 
@@ -191,7 +188,7 @@ Phaser.AnimationParser = {
         var frames = json['frames'];
         var newFrame;
         var i = 0;
-        
+
         for (var key in frames)
         {
             var uuid = game.rnd.uuid();
@@ -225,11 +222,7 @@ Phaser.AnimationParser = {
                     frames[key].spriteSourceSize.h
                 );
 
-                //  We had to hack Pixi to get this to work :(
-                PIXI.TextureCache[uuid].trimmed = true;
-                PIXI.TextureCache[uuid].trim.x = frames[key].spriteSourceSize.x;
-                PIXI.TextureCache[uuid].trim.y = frames[key].spriteSourceSize.y;
-
+                PIXI.TextureCache[uuid].trim = new Phaser.Rectangle(frames[key].spriteSourceSize.x, frames[key].spriteSourceSize.y, frames[key].sourceSize.w, frames[key].sourceSize.h);
             }
 
             i++;
@@ -273,7 +266,7 @@ Phaser.AnimationParser = {
         var frameY;
         var frameWidth;
         var frameHeight;
-        
+
         for (var i = 0; i < frames.length; i++)
         {
             uuid = game.rnd.uuid();
@@ -311,12 +304,7 @@ Phaser.AnimationParser = {
             {
                 newFrame.setTrim(true, width, height, frameX, frameY, frameWidth, frameHeight);
 
-                PIXI.TextureCache[uuid].realSize = { x: frameX, y: frameY, w: frameWidth, h: frameHeight };
-
-                //  We had to hack Pixi to get this to work :(
-                PIXI.TextureCache[uuid].trimmed = true;
-                PIXI.TextureCache[uuid].trim.x = frameX;
-                PIXI.TextureCache[uuid].trim.y = frameY;
+                PIXI.TextureCache[uuid].trim = new Phaser.Rectangle(frameX, frameY, width, height);
             }
         }
 

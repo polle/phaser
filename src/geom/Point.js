@@ -21,7 +21,7 @@ Phaser.Point = function (x, y) {
     * @property {number} x - The x coordinate of the point.
     */
     this.x = x;
-    
+
     /**
     * @property {number} y - The y coordinate of the point.
     */
@@ -59,10 +59,27 @@ Phaser.Point.prototype = {
     */
     setTo: function (x, y) {
 
-        this.x = x;
-        this.y = y;
+        this.x = x || 0;
+        this.y = y || ( (y !== 0) ? this.x : 0 );
+
         return this;
-        
+
+    },
+
+    /**
+    * Sets the x and y values of this Point object to the given coordinates.
+    * @method Phaser.Point#set
+    * @param {number} x - The horizontal position of this point.
+    * @param {number} y - The vertical position of this point.
+    * @return {Point} This Point object. Useful for chaining method calls.
+    */
+    set: function (x, y) {
+
+        this.x = x || 0;
+        this.y = y || ( (y !== 0) ? this.x : 0 );
+
+        return this;
+
     },
 
     /**
@@ -136,7 +153,7 @@ Phaser.Point.prototype = {
 
         this.x = Phaser.Math.clamp(this.x, min, max);
         return this;
-        
+
     },
 
     /**
@@ -150,7 +167,7 @@ Phaser.Point.prototype = {
 
         this.y = Phaser.Math.clamp(this.y, min, max);
         return this;
-        
+
     },
 
     /**
@@ -176,9 +193,16 @@ Phaser.Point.prototype = {
     */
     clone: function (output) {
 
-        if (typeof output === "undefined") { output = new Phaser.Point(); }
+        if (typeof output === "undefined")
+        {
+            output = new Phaser.Point(this.x, this.y);
+        }
+        else
+        {
+            output.setTo(this.x, this.y);
+        }
 
-        return output.setTo(this.x, this.y);
+        return output;
 
     },
 
@@ -387,7 +411,7 @@ Phaser.Point.equals = function (a, b) {
 */
 Phaser.Point.distance = function (a, b, round) {
 
-    if (typeof round === "undefined") { round = false }
+    if (typeof round === "undefined") { round = false; }
 
     if (round)
     {
@@ -430,3 +454,46 @@ Phaser.Point.rotate = function (a, x, y, angle, asDegrees, distance) {
     return a.setTo(x + distance * Math.cos(angle), y + distance * Math.sin(angle));
 
 };
+
+/**
+* Calculates centroid (or midpoint) from an array of points. If only one point is provided, that point is returned.
+* @method Phaser.Point.centroid
+* @param {Phaser.Point[]} points - The array of one or more points.
+* @param {Phaser.Point} [out] - Optional Point to store the value in, if not supplied a new Point object will be created.
+* @return {Phaser.Point} The new Point object.
+*/
+Phaser.Point.centroid = function (points, out) {
+
+    if (typeof out === "undefined") { out = new Phaser.Point(); }
+
+    if (Object.prototype.toString.call(points) !== '[object Array]')
+    {
+        throw new Error("Phaser.Point. Parameter 'points' must be an array");
+    }
+
+    var pointslength = points.length;
+
+    if (pointslength < 1)
+    {
+        throw new Error("Phaser.Point. Parameter 'points' array must not be empty");
+    }
+
+    if (pointslength === 1)
+    {
+        out.copyFrom(points[0]);
+        return out;
+    }
+
+    for (var i = 0; i < pointslength; i++)
+    {
+        Phaser.Point.add(out, points[i], out);
+    }
+
+    out.divide(pointslength, pointslength);
+
+    return out;
+
+};
+
+//   Because PIXI uses its own Point, we'll replace it with ours to avoid duplicating code or confusion.
+PIXI.Point = Phaser.Point;

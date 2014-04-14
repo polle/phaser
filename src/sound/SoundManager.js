@@ -20,19 +20,26 @@ Phaser.SoundManager = function (game) {
     * @property {Phaser.Game} game - Local reference to game.
     */
     this.game = game;
-    
+
     /**
     * @property {Phaser.Signal} onSoundDecode - The event dispatched when a sound decodes (typically only for mp3 files)
     */
     this.onSoundDecode = new Phaser.Signal();
-    
+
+    /**
+    * @property {boolean} _codeMuted - Internal mute tracking var.
+    * @private
+    * @default
+    */
+    this._codeMuted = false;
+
     /**
     * @property {boolean} _muted - Internal mute tracking var.
     * @private
     * @default
     */
     this._muted = false;
-   
+
     /**
     * @property {Description} _unlockSource - Internal unlock tracking var.
     * @private
@@ -43,14 +50,13 @@ Phaser.SoundManager = function (game) {
     /**
     * @property {number} _volume - The global audio volume. A value between 0 (silence) and 1 (full volume).
     * @private
-    * @default 
+    * @default
     */
     this._volume = 1;
 
     /**
-    * @property {array} _sounds - An array containing all the sounds 
+    * @property {array} _sounds - An array containing all the sounds
     * @private
-    * @default The empty array.
     */
     this._sounds = [];
 
@@ -59,19 +65,19 @@ Phaser.SoundManager = function (game) {
     * @default
     */
     this.context = null;
-    
+
     /**
     * @property {boolean} usingWebAudio - true if this sound is being played with Web Audio.
     * @readonly
     */
     this.usingWebAudio = true;
-    
+
     /**
     * @property {boolean} usingAudioTag - true if the sound is being played via the Audio tag.
     * @readonly
     */
     this.usingAudioTag = false;
-    
+
     /**
     * @property {boolean} noAudio - Has audio been disabled via the PhaserGlobal object? Useful if you need to use a 3rd party audio library instead.
     * @default
@@ -95,7 +101,7 @@ Phaser.SoundManager = function (game) {
     * @default
     */
     this.channels = 32;
-    
+
 };
 
 Phaser.SoundManager.prototype = {
@@ -148,21 +154,30 @@ Phaser.SoundManager.prototype = {
 
         if (!!window['AudioContext'])
         {
-            this.context = new window['AudioContext']();
+            try {
+                this.context = new window['AudioContext']();
+            } catch (error) {
+                this.context = null;
+                this.usingWebAudio = false;
+                this.noAudio = true;
+            }
         }
         else if (!!window['webkitAudioContext'])
         {
-            this.context = new window['webkitAudioContext']();
+            try {
+                this.context = new window['webkitAudioContext']();
+            } catch (error) {
+                this.context = null;
+                this.usingWebAudio = false;
+                this.noAudio = true;
+            }
         }
-        else if (!!window['Audio'])
+
+        if (!!window['Audio'] && this.context === null)
         {
             this.usingWebAudio = false;
             this.usingAudioTag = true;
-        }
-        else
-        {
-            this.usingWebAudio = false;
-            this.noAudio = true;
+            this.noAudio = false;
         }
 
         if (this.context !== null)
@@ -261,7 +276,7 @@ Phaser.SoundManager.prototype = {
                 this._sounds[i].resume();
             }
         }
-   
+
     },
 
     /**
@@ -347,23 +362,136 @@ Phaser.SoundManager.prototype = {
     },
 
     /**
+    * Removes a Sound from the SoundManager. The removed Sound is destroyed before removal.
+    *
+    * @method Phaser.SoundManager#remove
+    * @param {Phaser.Sound} sound - The sound object to remove.
+    * @return {boolean} True if the sound was removed successfully, otherwise false.
+    */
+    remove: function (sound) {
+
+        var i = this._sounds.length;
+
+        while (i--)
+        {
+            if (this._sounds[i] === sound)
+            {
+                this._sounds[i].destroy(false);
+                this._sounds.splice(i, 1);
+                return true;
+            }
+        }
+
+        return false;
+
+    },
+
+    /**
+    * Removes all Sounds from the SoundManager that have an asset key matching the given value.
+    * The removed Sounds are destroyed before removal.
+    *
+    * @method Phaser.SoundManager#removeByKey
+    * @param {string} key - The key to match when removing sound objects.
+    * @return {number} The number of matching sound objects that were removed.
+    */
+    removeByKey: function (key) {
+
+        var i = this._sounds.length;
+        var removed = 0;
+
+        while (i--)
+        {
+            if (this._sounds[i].key === key)
+            {
+                this._sounds[i].destroy(false);
+                this._sounds.splice(i, 1);
+                removed++;
+            }
+        }
+
+        return removed;
+
+    },
+
+    /**
     * Adds a new Sound into the SoundManager and starts it playing.
+    *
     * @method Phaser.SoundManager#play
     * @param {string} key - Asset key for the sound.
     * @param {number} [volume=1] - Default value for the volume.
     * @param {boolean} [loop=false] - Whether or not the sound will loop.
-    * @param {boolean} [destroyOnComplete=false] - If true the Sound will destroy itself once it has finished playing, or is stopped.
     * @return {Phaser.Sound} The new sound instance.
     */
-    play: function (key, volume, loop, destroyOnComplete) {
-
-        if (typeof destroyOnComplete == 'undefined') { destroyOnComplete = false; }
+    play: function (key, volume, loop) {
 
         var sound = this.add(key, volume, loop);
 
         sound.play();
 
         return sound;
+
+    },
+
+    /**
+    * Internal mute handler called automatically by the Sound.mute setter.
+    *
+    * @method Phaser.SoundManager#setMute
+    * @private
+    */
+    setMute: function () {
+
+        if (this._muted)
+        {
+            return;
+        }
+
+        this._muted = true;
+
+        if (this.usingWebAudio)
+        {
+            this._muteVolume = this.masterGain.gain.value;
+            this.masterGain.gain.value = 0;
+        }
+
+        //  Loop through sounds
+        for (var i = 0; i < this._sounds.length; i++)
+        {
+            if (this._sounds[i].usingAudioTag)
+            {
+                this._sounds[i].mute = true;
+            }
+        }
+
+    },
+
+    /**
+    * Internal mute handler called automatically by the Sound.mute setter.
+    *
+    * @method Phaser.SoundManager#unsetMute
+    * @private
+    */
+    unsetMute: function () {
+
+        if (!this._muted || this._codeMuted)
+        {
+            return;
+        }
+
+        this._muted = false;
+
+        if (this.usingWebAudio)
+        {
+            this.masterGain.gain.value = this._muteVolume;
+        }
+
+        //  Loop through sounds
+        for (var i = 0; i < this._sounds.length; i++)
+        {
+            if (this._sounds[i].usingAudioTag)
+            {
+                this._sounds[i].mute = false;
+            }
+        }
 
     }
 
@@ -394,22 +522,8 @@ Object.defineProperty(Phaser.SoundManager.prototype, "mute", {
                 return;
             }
 
-            this._muted = true;
-            
-            if (this.usingWebAudio)
-            {
-                this._muteVolume = this.masterGain.gain.value;
-                this.masterGain.gain.value = 0;
-            }
-
-            //  Loop through sounds
-            for (var i = 0; i < this._sounds.length; i++)
-            {
-                if (this._sounds[i].usingAudioTag)
-                {
-                    this._sounds[i].mute = true;
-                }
-            }
+            this._codeMuted = true;
+            this.setMute();
         }
         else
         {
@@ -418,21 +532,8 @@ Object.defineProperty(Phaser.SoundManager.prototype, "mute", {
                 return;
             }
 
-            this._muted = false;
-
-            if (this.usingWebAudio)
-            {
-                this.masterGain.gain.value = this._muteVolume;
-            }
-
-            //  Loop through sounds
-            for (var i = 0; i < this._sounds.length; i++)
-            {
-                if (this._sounds[i].usingAudioTag)
-                {
-                    this._sounds[i].mute = false;
-                }
-            }
+            this._codeMuted = false;
+            this.unsetMute();
         }
     }
 
@@ -443,7 +544,7 @@ Object.defineProperty(Phaser.SoundManager.prototype, "mute", {
 * @property {number} volume - Gets or sets the global volume of the SoundManager, a value between 0 and 1.
 */
 Object.defineProperty(Phaser.SoundManager.prototype, "volume", {
-    
+
     get: function () {
 
         if (this.usingWebAudio)
@@ -459,24 +560,24 @@ Object.defineProperty(Phaser.SoundManager.prototype, "volume", {
 
     set: function (value) {
 
-        value = this.game.math.clamp(value, 1, 0);
-
         this._volume = value;
 
         if (this.usingWebAudio)
         {
             this.masterGain.gain.value = value;
         }
-
-        //  Loop through the sound cache and change the volume of all html audio tags
-        for (var i = 0; i < this._sounds.length; i++)
+        else
         {
-            if (this._sounds[i].usingAudioTag)
+            //  Loop through the sound cache and change the volume of all html audio tags
+            for (var i = 0; i < this._sounds.length; i++)
             {
-                this._sounds[i].volume = this._sounds[i].volume * value;
+                if (this._sounds[i].usingAudioTag)
+                {
+                    this._sounds[i].volume = this._sounds[i].volume * value;
+                }
             }
         }
-        
+
     }
 
 });

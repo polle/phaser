@@ -18,7 +18,7 @@ Phaser.Touch = function (game) {
     * @property {Phaser.Game} game - A reference to the currently running game.
     */
     this.game = game;
-    
+
     /**
     * @property {boolean} disabled - You can disable all Touch events by setting disabled = true. While set all new touch events will be ignored.
     * @return {boolean}
@@ -34,32 +34,32 @@ Phaser.Touch = function (game) {
     * @property {function} touchStartCallback - A callback that can be fired on a touchStart event.
     */
     this.touchStartCallback = null;
-    
+
     /**
     * @property {function} touchMoveCallback - A callback that can be fired on a touchMove event.
     */
     this.touchMoveCallback = null;
-    
+
     /**
     * @property {function} touchEndCallback - A callback that can be fired on a touchEnd event.
     */
     this.touchEndCallback = null;
-    
+
     /**
     * @property {function} touchEnterCallback - A callback that can be fired on a touchEnter event.
     */
     this.touchEnterCallback = null;
-    
+
     /**
     * @property {function} touchLeaveCallback - A callback that can be fired on a touchLeave event.
     */
     this.touchLeaveCallback = null;
-    
+
     /**
     * @property {function} touchCancelCallback - A callback that can be fired on a touchCancel event.
     */
     this.touchCancelCallback = null;
-    
+
     /**
     * @property {boolean} preventDefault - If true the TouchEvent will have prevent.default called on it.
     * @default
@@ -124,6 +124,12 @@ Phaser.Touch.prototype = {
     */
     start: function () {
 
+        if (this._onTouchStart !== null)
+        {
+            //  Avoid setting multiple listeners
+            return;
+        }
+
         var _this = this;
 
         if (this.game.device.touch)
@@ -152,12 +158,12 @@ Phaser.Touch.prototype = {
                 return _this.onTouchCancel(event);
             };
 
-            this.game.renderer.view.addEventListener('touchstart', this._onTouchStart, false);
-            this.game.renderer.view.addEventListener('touchmove', this._onTouchMove, false);
-            this.game.renderer.view.addEventListener('touchend', this._onTouchEnd, false);
-            this.game.renderer.view.addEventListener('touchenter', this._onTouchEnter, false);
-            this.game.renderer.view.addEventListener('touchleave', this._onTouchLeave, false);
-            this.game.renderer.view.addEventListener('touchcancel', this._onTouchCancel, false);
+            this.game.canvas.addEventListener('touchstart', this._onTouchStart, false);
+            this.game.canvas.addEventListener('touchmove', this._onTouchMove, false);
+            this.game.canvas.addEventListener('touchend', this._onTouchEnd, false);
+            this.game.canvas.addEventListener('touchenter', this._onTouchEnter, false);
+            this.game.canvas.addEventListener('touchleave', this._onTouchLeave, false);
+            this.game.canvas.addEventListener('touchcancel', this._onTouchCancel, false);
         }
 
     },
@@ -356,12 +362,12 @@ Phaser.Touch.prototype = {
 
         if (this.game.device.touch)
         {
-            this.game.stage.canvas.removeEventListener('touchstart', this._onTouchStart);
-            this.game.stage.canvas.removeEventListener('touchmove', this._onTouchMove);
-            this.game.stage.canvas.removeEventListener('touchend', this._onTouchEnd);
-            this.game.stage.canvas.removeEventListener('touchenter', this._onTouchEnter);
-            this.game.stage.canvas.removeEventListener('touchleave', this._onTouchLeave);
-            this.game.stage.canvas.removeEventListener('touchcancel', this._onTouchCancel);
+            this.game.canvas.removeEventListener('touchstart', this._onTouchStart);
+            this.game.canvas.removeEventListener('touchmove', this._onTouchMove);
+            this.game.canvas.removeEventListener('touchend', this._onTouchEnd);
+            this.game.canvas.removeEventListener('touchenter', this._onTouchEnter);
+            this.game.canvas.removeEventListener('touchleave', this._onTouchLeave);
+            this.game.canvas.removeEventListener('touchcancel', this._onTouchCancel);
         }
 
     }

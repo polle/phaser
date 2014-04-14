@@ -17,7 +17,7 @@ Phaser.Mouse = function (game) {
     * @property {Phaser.Game} game - A reference to the currently running game.
     */
     this.game = game;
-    
+
     /**
     * @property {Object} callbackContext - The context under which callbacks are called.
     */
@@ -27,12 +27,12 @@ Phaser.Mouse = function (game) {
     * @property {function} mouseDownCallback - A callback that can be fired when the mouse is pressed down.
     */
     this.mouseDownCallback = null;
-    
+
     /**
     * @property {function} mouseMoveCallback - A callback that can be fired when the mouse is moved while pressed down.
     */
     this.mouseMoveCallback = null;
-    
+
     /**
     * @property {function} mouseUpCallback - A callback that can be fired when the mouse is released from a pressed down state.
     */
@@ -125,13 +125,19 @@ Phaser.Mouse.prototype = {
     */
     start: function () {
 
-        var _this = this;
-
         if (this.game.device.android && this.game.device.chrome === false)
         {
             //  Android stock browser fires mouse events even if you preventDefault on the touchStart, so ...
             return;
         }
+
+        if (this._onMouseDown !== null)
+        {
+            //  Avoid setting multiple listeners
+            return;
+        }
+
+        var _this = this;
 
         this._onMouseDown = function (event) {
             return _this.onMouseDown(event);
@@ -145,9 +151,9 @@ Phaser.Mouse.prototype = {
             return _this.onMouseUp(event);
         };
 
-        document.addEventListener('mousedown', this._onMouseDown, true);
-        document.addEventListener('mousemove', this._onMouseMove, true);
-        document.addEventListener('mouseup', this._onMouseUp, true);
+        this.game.canvas.addEventListener('mousedown', this._onMouseDown, true);
+        this.game.canvas.addEventListener('mousemove', this._onMouseMove, true);
+        this.game.canvas.addEventListener('mouseup', this._onMouseUp, true);
 
     },
 
@@ -165,7 +171,7 @@ Phaser.Mouse.prototype = {
             event.preventDefault();
         }
 
-        this.button = event.which;
+        this.button = event.button;
 
         if (this.mouseDownCallback)
         {
@@ -255,7 +261,7 @@ Phaser.Mouse.prototype = {
 
         if (this.game.device.pointerLock)
         {
-            var element = this.game.stage.canvas;
+            var element = this.game.canvas;
 
             element.requestPointerLock = element.requestPointerLock || element.mozRequestPointerLock || element.webkitRequestPointerLock;
 
@@ -281,7 +287,7 @@ Phaser.Mouse.prototype = {
     */
     pointerLockChange: function (event) {
 
-        var element = this.game.stage.canvas;
+        var element = this.game.canvas;
 
         if (document.pointerLockElement === element || document.mozPointerLockElement === element || document.webkitPointerLockElement === element)
         {
@@ -320,9 +326,9 @@ Phaser.Mouse.prototype = {
     */
     stop: function () {
 
-        document.removeEventListener('mousedown', this._onMouseDown, true);
-        document.removeEventListener('mousemove', this._onMouseMove, true);
-        document.removeEventListener('mouseup', this._onMouseUp, true);
+        this.game.canvas.removeEventListener('mousedown', this._onMouseDown, true);
+        this.game.canvas.removeEventListener('mousemove', this._onMouseMove, true);
+        this.game.canvas.removeEventListener('mouseup', this._onMouseUp, true);
 
     }
 
